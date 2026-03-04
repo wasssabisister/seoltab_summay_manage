@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.summury.matching-cron</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/hyeonseo-i/Documents/GitHub/summury_manage/scripts/cron-matching.sh</string>
+    </array>
+
+    <!-- 매일 오전 10시 (KST)에 실행 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- 로그 출력 -->
+    <key>StandardOutPath</key>
+    <string>/Users/hyeonseo-i/Documents/GitHub/summury_manage/logs/launchd-matching-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/hyeonseo-i/Documents/GitHub/summury_manage/logs/launchd-matching-stderr.log</string>
+
+    <!-- 실행 환경 -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

@@ -1,0 +1,309 @@
+============================================================
+  summury_manage - Windows 서버 노트북 설정 가이드
+============================================================
+
+※ onboarding_rela가 이미 포트 3000에서 실행 중인 서버 노트북에
+   summury_manage를 함께 운영하는 방법입니다.
+※ onboarding_rela의 run-cron.ps1과 충돌 없음
+   (별도 프로젝트 / 별도 포트 / 별도 스크립트)
+
+
+============================================================
+[1단계] 프로젝트 가져오기
+============================================================
+
+1) 원하는 위치에서 Git Clone:
+
+   cd C:\Users\사용자명\Documents
+   git clone https://github.com/YOUR_USERNAME/summury_manage.git
+   cd summury_manage
+
+2) 의존성 설치:
+
+   npm install
+
+
+============================================================
+[2단계] .env.local 파일 만들기
+============================================================
+
+프로젝트 루트(summury_manage 폴더)에 .env.local 파일 생성.
+메모장으로 아래 내용 붙여넣기:
+
+------- .env.local 시작 -------
+# MongoDB (onboarding_rela와 동일한 URI 사용)
+MONGODB_URI=mongodb+srv://여기에_현재_사용중인_URI
+
+# CoolSMS
+COOLSMS_API_KEY=여기에_API_KEY
+COOLSMS_API_SECRET=여기에_API_SECRET
+COOLSMS_SENDER_PHONE=여기에_발신번호
+COOLSMS_PFID=여기에_PFID
+COOLSMS_TEMPLATE_SUMMURY_MATCHING=KA01TP260205060238312wiFcFa587sd
+
+# CoolSMS 변수 매핑
+COOLSMS_VAR_STUDENT_NAME=학생명
+
+# 기본 구글 시트 ID
+GOOGLE_SHEET_ID=16stKifqmNVG7S_-_hps_N4dtJknZUohUkdxFR7wNH-g
+
+# Cron 인증용 시크릿 (아무 문자열 - 개발 노트북과 동일하게)
+CRON_SECRET=여기에_시크릿키
+
+# Seoltab 로그인 (스테이징)
+SEOLTAB_STAGING_EMAIL=opr3@seoltab.com
+SEOLTAB_STAGING_PASSWORD=여기에_스테이징_비밀번호
+
+# Seoltab 로그인 (프로덕션)
+SEOLTAB_PROD_EMAIL=opr.nikita@seoltab.com
+SEOLTAB_PROD_PASSWORD=여기에_프로덕션_비밀번호
+
+# Seoltab 크론 설정
+SEOLTAB_ENV=staging
+SEOLTAB_CRON_MESSAGE=여기에_자동발송_메시지_템플릿
+------- .env.local 끝 -------
+
+※ 모든 값은 개발 노트북의 .env.local에서 그대로 복사하면 됩니다.
+
+
+============================================================
+[3단계] 빌드 & 서버 실행 (포트 3001)
+============================================================
+
+1) 빌드:
+
+   npm run build
+
+2) 서버 실행 (포트 3001):
+
+   $env:PORT=3001; npm start
+
+   ※ onboarding_rela가 3000번을 사용하므로 3001번으로 실행
+
+3) 동작 확인:
+
+   브라우저에서 http://localhost:3001/admin 접속
+   → 운영 대상 테이블이 보이면 정상
+
+
+============================================================
+[4단계] 서버 영구 실행 (PC 부팅 시 자동 시작)
+============================================================
+
+방법 A) 간단한 배치 파일 (추천)
+------------------------------
+
+start-summury.bat 파일을 프로젝트 루트에 만들기:
+
+------- start-summury.bat -------
+@echo off
+cd /d C:\Users\사용자명\Documents\summury_manage
+set PORT=3001
+npm start
+------- 끝 -------
+
+이 bat 파일을 시작프로그램에 등록:
+  1. Win+R → shell:startup 입력 → Enter
+  2. 열린 폴더에 start-summury.bat의 바로가기 생성
+
+방법 B) 작업 스케줄러로 서버 자동 시작
+-------------------------------------
+
+  1. Win+S → "작업 스케줄러" 검색 → 열기
+  2. "기본 작업 만들기" 클릭
+  3. 이름: summury_server_start
+  4. 트리거: "컴퓨터를 시작할 때"
+  5. 동작: "프로그램 시작"
+     - 프로그램: cmd.exe
+     - 인수: /c "cd /d C:\Users\사용자명\Documents\summury_manage && set PORT=3001 && npm start"
+  6. 마침
+
+
+============================================================
+[5단계] 매칭 알림톡 자동 발송 (크론) 등록
+============================================================
+
+※ 이것이 핵심! 매일 오전 10시에 자동으로 매칭 알림톡 발송
+
+1) 수동 테스트 먼저:
+
+   PowerShell에서 실행:
+   powershell -ExecutionPolicy Bypass -File "C:\Users\사용자명\Documents\summury_manage\scripts\run-cron-matching.ps1"
+
+   → 로그 확인: summury_manage\logs\cron-matching-날짜.log
+
+2) 작업 스케줄러 등록:
+
+   1. Win+S → "작업 스케줄러" 검색 → 열기
+   2. 왼쪽 패널: "작업 스케줄러 라이브러리" 클릭
+   3. 오른쪽 패널: "작업 만들기" 클릭 (기본 작업 아님!)
+
+   [일반 탭]
+   - 이름: summury_matching_cron
+   - 설명: summury 매칭 알림톡 매일 자동 발송
+   - "사용자의 로그온 여부에 관계없이 실행" 선택
+   - "가장 높은 수준의 권한으로 실행" 체크
+
+   [트리거 탭]
+   - "새로 만들기" 클릭
+   - 시작: 매일
+   - 시간: 오전 10:00:00
+   - "사용" 체크
+   - 확인
+
+   [동작 탭]
+   - "새로 만들기" 클릭
+   - 동작: 프로그램 시작
+   - 프로그램/스크립트: powershell.exe
+   - 인수 추가: -ExecutionPolicy Bypass -File "C:\Users\사용자명\Documents\summury_manage\scripts\run-cron-matching.ps1"
+   - 시작 위치: C:\Users\사용자명\Documents\summury_manage
+   - 확인
+
+   [조건 탭]
+   - "컴퓨터의 AC 전원이 켜져 있는 경우에만..." 체크 해제
+     (노트북 배터리 모드에서도 실행하려면)
+
+   [설정 탭]
+   - "예약된 시작 시간을 놓친 경우 가능하면 즉시 실행" 체크
+     (노트북이 꺼져있다가 켜지면 바로 실행)
+   - "작업이 이미 실행 중인 경우..." → "새 인스턴스 시작 안 함"
+
+   3. "확인" → Windows 비밀번호 입력 → 완료!
+
+
+============================================================
+[6단계] Seoltab 과외채팅방 메시지 자동 발송 (크론) 등록
+============================================================
+
+※ 2시간마다 오늘 수업이 있는 과외방에 자동으로 메시지 발송
+
+1) 수동 테스트 먼저:
+
+   PowerShell에서 실행:
+   powershell -ExecutionPolicy Bypass -File "C:\Users\사용자명\Documents\summury_manage\scripts\run-cron-seoltab.ps1"
+
+   → 로그 확인: summury_manage\logs\cron-seoltab-날짜.log
+
+2) 작업 스케줄러 등록:
+
+   1. Win+S → "작업 스케줄러" 검색 → 열기
+   2. 왼쪽 패널: "작업 스케줄러 라이브러리" 클릭
+   3. 오른쪽 패널: "작업 만들기" 클릭
+
+   [일반 탭]
+   - 이름: summury_seoltab_cron
+   - 설명: summury 과외채팅방 메시지 2시간마다 자동 발송
+   - "사용자의 로그온 여부에 관계없이 실행" 선택
+   - "가장 높은 수준의 권한으로 실행" 체크
+
+   [트리거 탭]
+   - "새로 만들기" 클릭
+   - 시작: 매일
+   - 시간: 오전 8:00:00
+   - ★ "다음 간격으로 작업 반복" 체크
+     - 간격: 2시간
+     - 기간: 12시간 (오전 8시~오후 8시까지 6번 실행)
+   - "사용" 체크
+   - 확인
+
+   [동작 탭]
+   - "새로 만들기" 클릭
+   - 동작: 프로그램 시작
+   - 프로그램/스크립트: powershell.exe
+   - 인수 추가: -ExecutionPolicy Bypass -File "C:\Users\사용자명\Documents\summury_manage\scripts\run-cron-seoltab.ps1"
+   - 시작 위치: C:\Users\사용자명\Documents\summury_manage
+   - 확인
+
+   [조건 탭]
+   - "컴퓨터의 AC 전원이 켜져 있는 경우에만..." 체크 해제
+
+   [설정 탭]
+   - "예약된 시작 시간을 놓친 경우 가능하면 즉시 실행" 체크
+   - "작업이 이미 실행 중인 경우..." → "새 인스턴스 시작 안 함"
+
+   3. "확인" → Windows 비밀번호 입력 → 완료!
+
+
+============================================================
+[7단계] 정상 동작 확인
+============================================================
+
+1) 매칭 알림톡 크론 수동 테스트:
+   작업 스케줄러 → summury_matching_cron → 마우스 우클릭 → "실행"
+   로그: summury_manage\logs\cron-matching-날짜.log
+
+2) Seoltab 크론 수동 테스트:
+   작업 스케줄러 → summury_seoltab_cron → 마우스 우클릭 → "실행"
+   로그: summury_manage\logs\cron-seoltab-날짜.log
+
+3) MongoDB에서 발송 이력 확인:
+   http://localhost:3001/admin/dispatches
+
+
+============================================================
+[참고] onboarding_rela와의 관계
+============================================================
+
+- onboarding_rela:  포트 3000 / run-cron.ps1
+- summury_manage:   포트 3001 / run-cron-matching.ps1 (매칭 알림톡)
+                               / run-cron-seoltab.ps1  (과외채팅방 메시지)
+
+→ 서로 다른 포트, 다른 스크립트, 다른 작업 스케줄러 이름이라 충돌 없음
+→ 같은 MongoDB DB(onboarding_rela)를 사용하지만
+   summury_ 접두사가 붙은 컬렉션만 사용하므로 데이터 충돌 없음
+   - summury_message_dispatches
+   - summury_student_lesson_states
+   - summury_notification_logs
+   - summury_schedule_rules
+
+
+============================================================
+[참고] 경로 치환 안내
+============================================================
+
+위 가이드에서 "C:\Users\사용자명\Documents\summury_manage" 부분은
+실제 서버 노트북에 clone한 경로로 바꿔주세요.
+
+예: C:\Users\admin\Projects\summury_manage
+
+
+============================================================
+[문제 해결]
+============================================================
+
+Q: 크론이 실행 안 됨
+A: 1) summury_manage 서버(포트 3001)가 실행 중인지 확인
+   2) PowerShell에서 수동 테스트:
+      curl http://localhost:3001/api/cron/matching?secret=시크릿키 -Method POST
+   3) logs 폴더의 로그 파일 확인
+
+Q: "MONGODB_URI environment variable is not set" 에러
+A: .env.local 파일이 프로젝트 루트에 있는지 확인
+
+Q: 포트 충돌
+A: onboarding_rela가 3000, summury_manage가 3001인지 확인
+   겹치면 3002 등 다른 포트 사용
+   → .bat 파일과 .ps1 파일의 포트도 함께 변경
+
+Q: 알림톡 발송 실패
+A: http://localhost:3001/admin/dispatches 에서 실패 사유 확인
+   → "Retry" 버튼으로 재시도 가능
+
+Q: Seoltab 401 NO_AUTH 에러
+A: .env.local의 SEOLTAB_STAGING_EMAIL, SEOLTAB_STAGING_PASSWORD (또는 PROD) 확인
+   → 로그인 계정이 맞는지 포스트맨에서 먼저 테스트
+
+Q: Seoltab 크론은 돌았는데 발송 건수가 0
+A: 오늘 수업(next_schedule_datetime)이 있는 대상이 없으면 정상
+   → logs 폴더의 cron-seoltab-날짜.log 에서 상세 확인
+   → http://localhost:3001/admin/dispatches 에서 이벤트 타입 필터
+
+
+============================================================
+[참고] 크론 작업 전체 요약
+============================================================
+
+  작업 이름                  스크립트                     주기        대상
+  ─────────────────────────────────────────────────────────────────
+  summury_matching_cron     run-cron-matching.ps1        매일 10시   어제 배정된 수업 → 알림톡
+  summury_seoltab_cron      run-cron-seoltab.ps1         2시간마다   오늘 수업 → 과외채팅방 메시지
