@@ -9,9 +9,9 @@ const EVENT_TYPE = 'matching_first';
 /**
  * 매칭 알림톡 자동 발송 Cron 엔드포인트
  * 
- * 매일 특정 시간에 호출되어 어제 배정된 수업에 대해 매칭 알림톡을 자동 발송합니다.
+ * 매일 특정 시간에 호출되어 첫 수업 완료된 수업에 대해 매칭 알림톡을 자동 발송합니다.
  * - 각 수업(lvt)에 최초 1회만 발송
- * - latestAssignDatetime이 어제인 수업만 대상
+ * - ffTuda(첫 수업 일자)가 어제이고, fsSs(첫 수업 상태)가 DONE인 수업만 대상
  * - MongoDB의 StudentLessonState에서 데이터를 읽어 시트 API 호출 없이 빠르게 동작
  * 
  * Query Parameters:
@@ -51,19 +51,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Cron/Matching] 실행 시각: ${kstNow.toISOString()}, 어제: ${yesterdayStr}`);
 
-    // MongoDB에서 활성 수업 조회 (제외/보류 아닌 것 + latestAssignDatetime이 어제인 것)
+    // MongoDB에서 활성 수업 조회 (제외/보류 아닌 것 + ffTuda가 어제 + fsSs가 DONE)
     const allLessons = await StudentLessonState.find({
       status: { $nin: ['제외', '보류'] },
     }).lean();
 
-    // 어제 배정된 수업 필터링
+    // 첫 수업 일자가 어제이고 첫 수업 상태가 DONE인 수업 필터링
     const targetLessons = allLessons.filter((lesson) => {
-      const assign = lesson.latestAssignDatetime?.trim();
-      if (!assign) return false;
-      return assign.slice(0, 10) === yesterdayStr;
+      const ffTuda = lesson.ffTuda?.trim();
+      const fsSs = lesson.fsSs?.trim()?.toUpperCase();
+      if (!ffTuda || fsSs !== 'DONE') return false;
+      return ffTuda.slice(0, 10) === yesterdayStr;
     });
 
-    console.log(`[Cron/Matching] 전체 활성: ${allLessons.length}, 어제 배정: ${targetLessons.length}`);
+    console.log(`[Cron/Matching] 전체 활성: ${allLessons.length}, 어제 첫 수업 완료(DONE): ${targetLessons.length}`);
 
     let sentCount = 0;
     let skippedCount = 0;

@@ -9,7 +9,7 @@ const EVENT_TYPE = 'matching_first';
 /**
  * 매칭 알림톡 발송 API
  * 
- * 모든 수업(lvt)에 대해 최초 1회만 COOLSMS_TEMPLATE_SUMMURY_MATCHING 알림톡 발송
+ * 첫 수업 완료(ffTuda가 어제, fsSs가 DONE)된 수업에 대해 최초 1회 알림톡 발송
  * - MongoDB의 StudentLessonState에서 데이터를 읽어 시트 호출 없이 빠르게 동작
  * - idempotencyKey: matching_first:{lvt}
  * - 변수: #{학생명} → lesson.name
@@ -84,29 +84,43 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // latestAssignDatetime 필터
-      const assignDatetime = lesson.latestAssignDatetime?.trim();
-      if (!assignDatetime) {
+      // ffTuda(첫 수업 일자) + fsSs(첫 수업 상태) 필터
+      const ffTuda = lesson.ffTuda?.trim();
+      const fsSs = lesson.fsSs?.trim()?.toUpperCase();
+
+      if (!ffTuda) {
         skippedCount++;
         results.push({
           lvt,
           name: lesson.name || '-',
           phone: lesson.phoneNumber || '-',
           status: 'skipped',
-          reason: '선생님 배정 일시 없음',
+          reason: '첫 수업 일자 없음',
         });
         continue;
       }
 
-      const assignDate = assignDatetime.slice(0, 10);
-      if (assignDate !== yesterdayStr) {
+      if (fsSs !== 'DONE') {
         skippedCount++;
         results.push({
           lvt,
           name: lesson.name || '-',
           phone: lesson.phoneNumber || '-',
           status: 'skipped',
-          reason: `배정일이 어제가 아님 (${assignDate})`,
+          reason: `첫 수업 상태가 DONE이 아님 (${fsSs || '없음'})`,
+        });
+        continue;
+      }
+
+      const ffTudaDate = ffTuda.slice(0, 10);
+      if (ffTudaDate !== yesterdayStr) {
+        skippedCount++;
+        results.push({
+          lvt,
+          name: lesson.name || '-',
+          phone: lesson.phoneNumber || '-',
+          status: 'skipped',
+          reason: `첫 수업 일자가 어제가 아님 (${ffTudaDate})`,
         });
         continue;
       }
